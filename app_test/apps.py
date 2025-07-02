@@ -1,0 +1,9 @@
+from django.apps import AppConfig
+
+
+class AppTestConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'app_test'
+
+    def ready(self):
+        from app_test import signals
