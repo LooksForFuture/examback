@@ -31,18 +31,18 @@ def get_user_data(user_id):
     except:
         return None
 
-#active users are stored based on their jwt token
+#active users are stored based on their user_id
 active_users = []
 
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
-        self.scope["token"] = None #jwt token
+        self.scope["user_id"] = None #jwt token
         self.accept()
     
     def disconnect(self, close_code):
-        if self.scope["token"] != None:
+        if self.scope["user_id"] != None:
             for i in range(len(active_users)):
-                if active_users[i]["user_id"] == self.scope["token"]["user_id"]:
+                if active_users[i] == self.scope["user_id"]:
                     del active_users[i]
                     break
 
@@ -56,7 +56,7 @@ class ChatConsumer(WebsocketConsumer):
                 "authed",
                 {
                     'type':'active_users',
-                    'message':[get_user_data(token["user_id"]) for token in active_users]
+                    'message':[get_user_data(user_id) for user_id in active_users]
                 }
             )
 
@@ -75,7 +75,7 @@ class ChatConsumer(WebsocketConsumer):
                 }))
                 return
 
-            self.scope["token"] = token
+            self.scope["user_id"] = token["user_id"]
             #add user to the authed users
             async_to_sync(self.channel_layer.group_add)(
                 "authed",
@@ -84,17 +84,18 @@ class ChatConsumer(WebsocketConsumer):
 
             found = False
             for user in active_users:
-                if user["user_id"] == token["user_id"]:
+                if user == token["user_id"]:
                     found = True
+                    return
 
             if not found:
-                active_users.append(token) #add user to the active ones
+                active_users.append(token["user_id"]) #add user to the active ones
                 #inform everyone about the enterance of new user
                 async_to_sync(self.channel_layer.group_send)(
                     "authed",
                     {
                         'type':'active_users',
-                        'message':[get_user_data(token["user_id"]) for token in active_users]
+                        'message':[get_user_data(user_id) for user_id in active_users]
                     }
                 )
         
@@ -105,7 +106,7 @@ class ChatConsumer(WebsocketConsumer):
                 if self.scope["token"]:
                     self.send(dumps({
                         "type":"active_users",
-                        "message":[get_user_data(token["user_id"]) for token in active_users]
+                        "message":[get_user_data(user_id) for user_id in active_users]
                     }))
                 else:
                     #client has not been authenticated
