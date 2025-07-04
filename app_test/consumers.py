@@ -31,42 +31,59 @@ def get_user_data(user_id):
     except:
         return None
 
-#active users are stored based on their user_id
-active_users = []
+"""
+active_users dictionary:
+    key -> user_id
+    value -> websocket channels
+"""
+active_users = {}
 
 class ChatConsumer(WebsocketConsumer):
+    #utility function for removing self connection from active_users
+    def remove_from_active(self) -> bool:
+        if self.scope["user_id"]:
+            user_id = self.scope["user_id"]
+            active_user = active_users[user_id]
+            for i in range(len(active_user)):
+                if active_user[i] == self.channel_name:
+                    del active_users[user_id][i]
+                    if len(active_users[user_id]) == 0:
+                        del active_users[user_id]
+                        #inform everyone about the exit of user
+                        async_to_sync(self.channel_layer.group_send)(
+                            "authed",
+                            {
+                                'type':'active_users',
+                                'message':[get_user_data(user_id) for user_id in active_users.keys()]
+                            }
+                        )
+                    return True
+        
+        return False
+
     def connect(self):
         self.scope["user_id"] = None #jwt token
         self.accept()
     
     def disconnect(self, close_code):
         if self.scope["user_id"] != None:
-            for i in range(len(active_users)):
-                if active_users[i] == self.scope["user_id"]:
-                    del active_users[i]
-                    break
-
             #remove from authed group
             async_to_sync(self.channel_layer.group_discard)(
                 "authed",
                 self.channel_name
             )
-            #inform everyone about the exit of user
-            async_to_sync(self.channel_layer.group_send)(
-                "authed",
-                {
-                    'type':'active_users',
-                    'message':[get_user_data(user_id) for user_id in active_users]
-                }
-            )
+            self.remove_from_active()
 
     def receive(self, text_data):
         text_data_json = loads(text_data)
 
         #trying to authenticate -> need a jwt token
         if text_data_json["type"] == "auth":
+            token = None #jwt token
+            user_id = None
             try:
                 token = AccessToken(text_data_json["message"])
+                user_id = token["user_id"]
             except:
                 #token is invalid
                 self.send(dumps({
@@ -75,27 +92,45 @@ class ChatConsumer(WebsocketConsumer):
                 }))
                 return
 
-            self.scope["user_id"] = token["user_id"]
+            if self.scope["user_id"]:
+                if self.scope["user_id"] == user_id:
+                    return
+
+                #user has changed profile
+                self.remove_from_active()
+                self.scope["user_id"] = user_id
+
+            else:
+                #channel had not been authenticated
+                self.scope["user_id"] = user_id
+            
             #add user to the authed users
             async_to_sync(self.channel_layer.group_add)(
                 "authed",
                 self.channel_name
             )
 
+            #check if this user is authed by another channel
             found = False
-            for user in active_users:
-                if user == token["user_id"]:
+            for user, channels in active_users.items():
+                if user == user_id:
                     found = True
+                    active_users[user_id].append(self.channel_name) #associate channel with user
+                    self.send(dumps({
+                        "type":"active_users",
+                        "message":[get_user_data(user_id) for user_id in active_users.keys()]
+                    }))
                     return
 
             if not found:
-                active_users.append(token["user_id"]) #add user to the active ones
+                active_users[user_id] = []
+                active_users[user_id].append(self.channel_name) #add user to the active ones
                 #inform everyone about the enterance of new user
                 async_to_sync(self.channel_layer.group_send)(
                     "authed",
                     {
                         'type':'active_users',
-                        'message':[get_user_data(user_id) for user_id in active_users]
+                        'message':[get_user_data(user_id) for user_id in active_users.keys()]
                     }
                 )
         
@@ -103,10 +138,10 @@ class ChatConsumer(WebsocketConsumer):
         elif text_data_json["type"] == "query":
             #client wants to know the authed users
             if text_data_json["message"] == "get_active_users":
-                if self.scope["token"]:
+                if self.scope["user_id"]:
                     self.send(dumps({
                         "type":"active_users",
-                        "message":[get_user_data(user_id) for user_id in active_users]
+                        "message":[get_user_data(user_id) for user_id in active_users.keys()]
                     }))
                 else:
                     #client has not been authenticated
@@ -117,7 +152,7 @@ class ChatConsumer(WebsocketConsumer):
             
             #client wants to know if they are connected
             elif text_data_json["message"] == "auth":
-                if self.scope["token"]:
+                if self.scope["user_id"]:
                     self.send(dumps({
                         "type":"auth",
                         "message":True
