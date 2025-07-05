@@ -6,6 +6,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 from asgiref.sync import async_to_sync
 
 from django.contrib.auth import get_user_model
+from competition.settings import DEBUG
 
 User = get_user_model()
 
@@ -87,7 +88,7 @@ class ChatConsumer(JsonWebsocketConsumer):
             message_type = json_data["type"]
             message = json_data["message"]
         except:
-            if True: print("incorrect message:", json_data)
+            if DEBUG: print("incorrect message:", json_data)
 
         #trying to authenticate -> need a jwt token
         if message_type == "auth":
