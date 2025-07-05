@@ -1,6 +1,7 @@
 from json import loads, dumps
 
 from channels.generic.websocket import WebsocketConsumer
+from channels.generic.websocket import JsonWebsocketConsumer
 from rest_framework_simplejwt.tokens import AccessToken
 from asgiref.sync import async_to_sync
 
@@ -38,7 +39,7 @@ active_users dictionary:
 """
 active_users = {}
 
-class ChatConsumer(WebsocketConsumer):
+class ChatConsumer(JsonWebsocketConsumer):
     #utility function for removing self connection from active_users
     def remove_from_active(self) -> bool:
         if self.scope["user_id"]:
@@ -74,22 +75,33 @@ class ChatConsumer(WebsocketConsumer):
             )
             self.remove_from_active()
 
-    def receive(self, text_data):
-        text_data_json = loads(text_data)
+    def receive_json(self, json_data):
+        """
+        All messages must have two arguments
+            -> type:str
+            -> message:any
+        """
+        message_type:str = ""
+        message = None
+        try:
+            message_type = json_data["type"]
+            message = json_data["message"]
+        except:
+            if True: print("incorrect message:", json_data)
 
         #trying to authenticate -> need a jwt token
-        if text_data_json["type"] == "auth":
+        if message_type == "auth":
             token = None #jwt token
             user_id = None
             try:
-                token = AccessToken(text_data_json["message"])
+                token = AccessToken(message)
                 user_id = token["user_id"]
             except:
                 #token is invalid
-                self.send(dumps({
+                self.send_json({
                     "type":"error",
                     "message":"auth"
-                }))
+                })
                 return
 
             if self.scope["user_id"]:
@@ -116,10 +128,10 @@ class ChatConsumer(WebsocketConsumer):
                 if user == user_id:
                     found = True
                     active_users[user_id].append(self.channel_name) #associate channel with user
-                    self.send(dumps({
+                    self.send_json({
                         "type":"active_users",
                         "message":[get_user_data(user_id) for user_id in active_users.keys()]
-                    }))
+                    })
                     return
 
             if not found:
@@ -135,59 +147,59 @@ class ChatConsumer(WebsocketConsumer):
                 )
         
         #client wants information
-        elif text_data_json["type"] == "query":
+        elif message_type == "query":
             #client wants to know the authed users
-            if text_data_json["message"] == "get_active_users":
+            if message == "get_active_users":
                 if self.scope["user_id"]:
-                    self.send(dumps({
+                    self.send_json({
                         "type":"active_users",
                         "message":[get_user_data(user_id) for user_id in active_users.keys()]
-                    }))
+                    })
                 else:
                     #client has not been authenticated
-                    self.send(dumps({
+                    self.send_json({
                         "type":"error",
                         "message":"auth"
-                    }))
+                    })
             
             #client wants to know if they are connected
-            elif text_data_json["message"] == "auth":
+            elif message == "auth":
                 if self.scope["user_id"]:
-                    self.send(dumps({
+                    self.send_json({
                         "type":"auth",
                         "message":True
-                    }))
+                    })
                 
                 else:
-                    self.send(dumps({
+                    self.send_json({
                         "type":"auth",
                         "message":False
-                    }))
+                    })
 
             #client message is not recognized
             else:
-                self.send(dumps({
+                self.send_json({
                     "type":"error",
                     "message":"La Li Lu Le Lo"
-                }))
+                })
 
         #client message is not recognized
         else:
-            self.send(dumps({
+            self.send_json({
                 "type":"error",
                 "message":"La Li Lu Le Lo"
-            }))
+            })
 
     def active_users(self, event):
         message = event['message']
-        self.send(text_data=dumps({
+        self.send_json({
             "type":"active_users",
             "message":message
-        }))
+        })
     
     def question_started(self, event):
         message = event["message"]
-        self.send(text_data=dumps({
+        self.send_json({
             "type":"question_started",
             "message":message
-        }))
+        })
