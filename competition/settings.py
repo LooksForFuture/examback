@@ -28,9 +28,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-eywq79(sn3boid+$6#bh6)6pyqn0kly-_g2sk=#3v+@z-9gf%^'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG', bool)
+DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['https://examback-production.up.railway.app', 'https://examfront-nine.vercel.app']
 
 
 # Application definition
@@ -65,6 +65,7 @@ CHANNEL_LAYERS = {
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
@@ -181,7 +182,7 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend']
 }
 
-CORS_ALLOWED_ORIGINS = env('CORS_ALLOWED_ORIGINS', list)
+CORS_ALLOWED_ORIGINS = ["https://examback-production.up.railway.app", "https://examfront-nine.vercel.app"]
 #CORS_ALLOW_ALL_ORIGINS = True
 
 SIMPLE_JWT = {
