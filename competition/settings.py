@@ -10,7 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
-import environ
+import os, environ
 from pathlib import Path
 from datetime import timedelta
 
@@ -30,8 +30,8 @@ SECRET_KEY = 'django-insecure-eywq79(sn3boid+$6#bh6)6pyqn0kly-_g2sk=#3v+@z-9gf%^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['https://examback-production.up.railway.app', 'https://examfront-nine.vercel.app']
-
+ALLOWED_HOSTS = ['*']
+CSRF_TRUSTED_ORIGINS = ['*']
 
 # Application definition
 
@@ -100,13 +100,30 @@ WSGI_APPLICATION = 'competition.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+# Set default values for the environment variables if they’re not already set
+os.environ.setdefault("PGDATABASE", "liftoff_dev")
+os.environ.setdefault("PGUSER", "username")
+os.environ.setdefault("PGPASSWORD", "")
+os.environ.setdefault("PGHOST", "localhost")
+os.environ.setdefault("PGPORT", "5432")
+
 if DEBUG:
+    # DATABASES = {
+    #     'default': {
+    #         'ENGINE': 'django.db.backends.sqlite3',
+    #         'NAME': BASE_DIR / 'db.sqlite3',
+    #     }
+    # }
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ["PGDATABASE"],
+            'USER': os.environ["PGUSER"],
+            'PASSWORD': os.environ["PGPASSWORD"],
+            'HOST': os.environ["PGHOST"],
+            'PORT': os.environ["PGPORT"],
     }
+}
 else:
     DATABASES = {
         'default': {
@@ -182,7 +199,7 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend']
 }
 
-CORS_ALLOWED_ORIGINS = ["https://examback-production.up.railway.app", "https://examfront-nine.vercel.app"]
+CORS_ALLOWED_ORIGINS = ["https://examfront-nine.vercel.app"]
 #CORS_ALLOW_ALL_ORIGINS = True
 
 SIMPLE_JWT = {
