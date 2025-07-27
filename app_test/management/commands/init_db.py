@@ -1,7 +1,8 @@
+from django.db.models import Q
 import random
 from django.core.management.base import BaseCommand
 from faker import Faker
-from app_test.models import Test, Question, Answer, UserAnswer
+from app_test.models import Test, Question, Answer, UserAnswer, UserTestResult
 from django.contrib.auth import get_user_model
 from datetime import timedelta
 from django.utils import timezone
@@ -13,13 +14,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         fake = Faker()
+        admin = User.objects.get(username='admin')
+        User.objects.filter(~Q(username='admin')).delete()
         Test.objects.all().delete()
         Question.objects.all().delete()
         Answer.objects.all().delete()
         UserAnswer.objects.all().delete()
+        UserTestResult.objects.all().delete()
 
         # Generate fake users
-        users = []
+        users = [admin]
         for _ in range(10):
             user = User.objects.create_user(
                 username=fake.user_name(),
@@ -73,7 +77,20 @@ class Command(BaseCommand):
                 user_answer = UserAnswer.objects.create(
                     user=user,
                     answer=answer,
-                    create_datetime=timezone.now() - timedelta(days=random.randint(1, 30))
+                    create_datetime=timezone.now() - timedelta(days=random.randint(1, 30)),
+                    score=1
+                )
+                user_answers.append(user_answer)
+        self.stdout.write(self.style.SUCCESS(f'Created {len(user_answers)} fake user answers.'))
+
+        for user in users:
+            user_test_ids = user.useranswer_set.values_list('answer__question__test', flat=True)
+            for test in Test.objects.filter(id__in=user_test_ids):
+                score = sum(user.useranswer_set.filter(answer__question__test=test).values_list('score', flat=True))
+                user_answer = UserTestResult.objects.create(
+                    user=user,
+                    test=test,
+                    score=score
                 )
                 user_answers.append(user_answer)
         self.stdout.write(self.style.SUCCESS(f'Created {len(user_answers)} fake user answers.'))
