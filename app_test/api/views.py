@@ -1,3 +1,4 @@
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets, mixins
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.exceptions import PermissionDenied
@@ -20,7 +21,7 @@ from app_test.api.serializers import (
 
 
 class TestViewSet(viewsets.ModelViewSet):
-    queryset = Test.objects.filter(status__in=['active', 'finished'])
+    queryset = Test.objects.all()
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['status']
 
