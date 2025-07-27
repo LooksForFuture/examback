@@ -34,46 +34,36 @@ def get_user_data(user_id):
         return None
 
 """
-active_users dictionary:
-    key -> user_id
-    value -> websocket channels
+active_rooms = {
+    room_id: {user_id: connection_count}
+}
 """
-active_users = {}
+active_rooms = {}
 
-class ChatConsumer(JsonWebsocketConsumer):
+class CompetitionConsumer(JsonWebsocketConsumer):
     #utility function for removing self connection from active_users
-    def remove_from_active(self) -> bool:
-        if self.scope["user_id"]:
+    def remove_from_active(self) -> None:
+        if self.scope["room"]:
+            room = active_rooms[self.scope["room"]]
             user_id = self.scope["user_id"]
-            active_user = active_users[user_id]
-            for i in range(len(active_user)):
-                if active_user[i] == self.channel_name:
-                    del active_users[user_id][i]
-                    if len(active_users[user_id]) == 0:
-                        del active_users[user_id]
-                        #inform everyone about the exit of user
-                        async_to_sync(self.channel_layer.group_send)(
-                            "authed",
-                            {
-                                'type':'active_users',
-                                'message':[get_user_data(user_id) for user_id in active_users.keys()]
-                            }
-                        )
-                    return True
-        
-        return False
+            room[user_id]-=1
+            if (room[user_id] == 0):
+                del room[user_id]
+            
+            async_to_sync(self.channel_layer.group_send)(
+                self.scope["room"],
+                {
+                    'type':'active_users',
+                }
+            )
 
     def connect(self):
         self.scope["user_id"] = None #jwt token
+        self.scope["room"] = None #Test model id
         self.accept()
     
     def disconnect(self, close_code):
         if self.scope["user_id"] != None:
-            #remove from authed group
-            async_to_sync(self.channel_layer.group_discard)(
-                "authed",
-                self.channel_name
-            )
             self.remove_from_active()
 
     def receive_json(self, json_data):
@@ -105,56 +95,79 @@ class ChatConsumer(JsonWebsocketConsumer):
                 })
                 return
 
-            if self.scope["user_id"]:
-                if self.scope["user_id"] == user_id:
-                    return
+            if self.scope["user_id"] == user_id:
+                return
 
-                #user has changed profile
+            #user has changed profile
+            self.scope["user_id"] = user_id
+            if self.scope["room"] != None:
+                room = self.scope["room"]
                 self.remove_from_active()
-                self.scope["user_id"] = user_id
-
-            else:
-                #channel had not been authenticated
-                self.scope["user_id"] = user_id
-            
-            #add user to the authed users
-            async_to_sync(self.channel_layer.group_add)(
-                "authed",
-                self.channel_name
-            )
-
-            #check if this user is authed by another channel
-            found = False
-            for user, channels in active_users.items():
-                if user == user_id:
-                    found = True
-                    active_users[user_id].append(self.channel_name) #associate channel with user
-                    self.send_json({
-                        "type":"active_users",
-                        "message":[get_user_data(user_id) for user_id in active_users.keys()]
-                    })
-                    return
-
-            if not found:
-                active_users[user_id] = []
-                active_users[user_id].append(self.channel_name) #add user to the active ones
-                #inform everyone about the enterance of new user
+                if user_id in active_rooms[room]:
+                    active_rooms[room][user_id] += 1
+                else:
+                    active_rooms[room][user_id] = 1
+                
                 async_to_sync(self.channel_layer.group_send)(
-                    "authed",
+                    self.scope["room"],
                     {
                         'type':'active_users',
-                        'message':[get_user_data(user_id) for user_id in active_users.keys()]
                     }
                 )
+        
+        elif message_type == "goto_room":
+            if not self.scope["user_id"]:
+                return
+
+            room_id:str = None
+            try:
+                room_id = str(int(message))
+            except:
+                self.send_json({
+                    "type":"error",
+                    "message":"invalid_room"
+                })
+                return
+
+            user_id = self.scope["user_id"]
+            self.remove_from_active()
+
+            if not room_id in active_rooms:
+                active_rooms[room_id] = {}
+
+            if user_id in active_rooms[room_id]:
+                active_rooms[room_id][user_id] += 1
+            else:
+                active_rooms[room_id][user_id] = 1
+
+            self.scope["room"] = room_id
+            #add user to the exam room
+            async_to_sync(self.channel_layer.group_add)(
+                room_id,
+                self.channel_name
+            )
+            async_to_sync(self.channel_layer.group_send)(
+                room_id,
+                {
+                    'type':'active_users',
+                }
+            )
         
         #client wants information
         elif message_type == "query":
             #client wants to know the authed users
             if message == "get_active_users":
                 if self.scope["user_id"]:
+                    if not self.scope["room"]:
+                        self.send_json({
+                            "type":"error",
+                            "message":"not_in_room"
+                        })
+                        return
+                    room = self.scope["room"]
                     self.send_json({
                         "type":"active_users",
-                        "message":[get_user_data(user_id) for user_id in active_users.keys()]
+                        "message": [get_user_data(user_id) for user_id in active_rooms[room].keys()]
                     })
                 else:
                     #client has not been authenticated
@@ -186,16 +199,21 @@ class ChatConsumer(JsonWebsocketConsumer):
 
         #client message is not recognized
         else:
+            if DEBUG: print("undefined message -", json_data)
             self.send_json({
                 "type":"error",
                 "message":"La Li Lu Le Lo"
             })
 
     def active_users(self, event):
-        message = event['message']
+        if not self.scope["room"]:
+            return
+        
+        room = self.scope["room"]
+        user_id = self.scope["user_id"]
         self.send_json({
             "type":"active_users",
-            "message":message
+            "message":[get_user_data(user_id) for user_id in active_rooms[room].keys()]
         })
     
     def question_started(self, event):

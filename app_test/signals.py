@@ -28,7 +28,7 @@ def notify_about_question(question):
             "title":answer.title,
         })
 
-    group_name = "authed"
+    group_name = str(question.test.id)
     message_data = {
         "type": "question_started",
         "message": {
@@ -44,7 +44,7 @@ def notify_about_question(question):
     async_to_sync(channel_layer.group_send)(group_name, message_data)
 
 @receiver(pre_save, sender=Question, weak=False)
-def post_save_question(sender, instance, *args, **kwargs):
+def pre_save_question(sender, instance, *args, **kwargs):
     if instance.start_datetime:
         instance.start_datetime += timedelta(seconds=3)
 
