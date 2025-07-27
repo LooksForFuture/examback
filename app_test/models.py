@@ -96,7 +96,7 @@ class UserAnswer(models.Model):
             elif self.answer:
                 result, created = UserTestResult.objects.get_or_create(test=self.answer.question.test, user=self.user)
                 self.result = result
-            super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         if hasattr(self.answer, 'title'):
