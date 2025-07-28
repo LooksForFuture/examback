@@ -1,7 +1,9 @@
+from drf_yasg import openapi
 from django.utils import timezone
 from rest_framework import serializers
 from app_test.models import CustomUser
 from app_test.models import Test, Question, Answer, UserAnswer, UserTestResult
+from drf_yasg.utils import swagger_serializer_method
 
 
 class ManagerTestSerializer(serializers.ModelSerializer):
@@ -126,13 +128,18 @@ class MyUserTestResultTestSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class UserTestResultUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['username']
+
+
 class UserTestResultSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
 
+    @swagger_serializer_method(serializer_or_field=UserTestResultUserSerializer)
     def get_user(self, obj):
-        return {
-            'username': obj.user.username
-        }
+        return UserTestResultUserSerializer(obj.user).data
 
     class Meta:
         model = UserTestResult

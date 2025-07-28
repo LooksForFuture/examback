@@ -102,6 +102,14 @@ class ActiveQuestionView(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         return Question.objects.filter(start_datetime__isnull=False).first()
 
 
+@swagger_auto_schema(
+    method='get',
+    responses={
+        200: UserTestResultSerializer(many=True),
+        404: "Test not found"
+    },
+    operation_description="Retrieve the results for a specific test, ordered by score"
+)
 @api_view(['GET'])
 def result(request, test_id):
     queryset = UserTestResult.objects.filter(test__id=test_id).order_by('-score')
