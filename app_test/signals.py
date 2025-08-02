@@ -50,15 +50,16 @@ def pre_save_question(sender, instance, *args, **kwargs):
 
 @receiver(post_save, sender=Question, weak=False)
 def post_save_question(sender, instance, created, **kwargs):
-    if instance.start_datetime:
-        time_to_start = (instance.start_datetime - datetime.now(instance.start_datetime.tzinfo)).total_seconds()
+    if not instance.start_datetime:
+        return
 
-        if time_to_start >= 0:
-            threading.Timer(
-                time_to_start,
-                notify_about_question,
-                args=(instance, )
-            ).start()
+    time_to_start = (instance.start_datetime - datetime.now(instance.start_datetime.tzinfo)).total_seconds()
+    if time_to_start >= 0:
+        threading.Timer(
+            time_to_start,
+            notify_about_question,
+            args=(instance, )
+        ).start()
 
 
 @receiver(post_save, sender=UserAnswer, weak=False)
