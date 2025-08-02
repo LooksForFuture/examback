@@ -100,21 +100,16 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['first_name', 'last_name', 'username', 'is_online', 'active_test_score']
 
 
-class UserProfileSerializer(UserSerializer):
-    
-    test_result_list = serializers.SerializerMethodField()
-
-    def get_test_result_list(self, obj):
-        return MyUserTestResultSerializer(obj.usertestresult_set.all(), many=True).data
-
+class MyUserTestResultTestSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CustomUser
-        fields = ['first_name', 'last_name', 'username', 'is_online', 'active_test_score', 'test_result_list']
+        model = Test
+        fields = '__all__'
 
 
 class MyUserTestResultSerializer(serializers.ModelSerializer):
     test = serializers.SerializerMethodField()
 
+    @swagger_serializer_method(serializer_or_field=MyUserTestResultTestSerializer)
     def get_test(self, obj):
         return MyUserTestResultTestSerializer(obj.test).data
     
@@ -122,10 +117,18 @@ class MyUserTestResultSerializer(serializers.ModelSerializer):
         model = UserTestResult
         exclude = ('user', )
 
-class MyUserTestResultTestSerializer(serializers.ModelSerializer):
+
+class UserProfileSerializer(UserSerializer):
+    
+    test_result_list = serializers.SerializerMethodField()
+
+    @swagger_serializer_method(serializer_or_field=MyUserTestResultSerializer(many=True))
+    def get_test_result_list(self, obj):
+        return MyUserTestResultSerializer(obj.usertestresult_set.all(), many=True).data
+
     class Meta:
-        model = Test
-        fields = '__all__'
+        model = CustomUser
+        fields = ['first_name', 'last_name', 'username', 'is_online', 'active_test_score', 'test_result_list']
 
 
 class UserTestResultUserSerializer(serializers.ModelSerializer):
