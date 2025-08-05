@@ -50,7 +50,7 @@ def pre_save_question(sender, instance, *args, **kwargs):
 
 @receiver(post_save, sender=Question, weak=False)
 def post_save_question(sender, instance, created, **kwargs):
-    if not instance.start_datetime:
+    if not instance.start_datetime or instance.test.status != "active":
         return
 
     time_to_start = (instance.start_datetime - datetime.now(instance.start_datetime.tzinfo)).total_seconds()
