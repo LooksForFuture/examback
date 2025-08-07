@@ -8,6 +8,8 @@ from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
 from competition.settings import DEBUG
 
+from app_test.models import UserTestResult
+
 User = get_user_model()
 
 #return username from databse based on the passed user_id
@@ -19,7 +21,9 @@ def get_username(user_id):
     except:
         return None
 
-def get_user_data(user_id):
+def get_user_data(user_id, test_id):
+    score = UserTestResult.objects.get(user=user_id,
+                                       test=test_id).score
     try:
         user = User.objects.get(id=user_id)
         return {
@@ -27,7 +31,7 @@ def get_user_data(user_id):
             "last_name":user.last_name,
             "username":user.username,
             "is_online":True,
-            "active_test_score":100,
+            "active_test_score":score,
         }
     
     except:
@@ -44,14 +48,16 @@ class CompetitionConsumer(JsonWebsocketConsumer):
     #utility function for removing self connection from active_users
     def remove_from_active(self) -> None:
         if self.scope["room"]:
-            room = active_rooms[self.scope["room"]]
+            room = self.scope["room"]
             user_id = self.scope["user_id"]
-            room[user_id]-=1
-            if (room[user_id] == 0):
-                del room[user_id]
-            
+            active_rooms[room][user_id] = active_rooms[room][user_id] - 1
+            if active_rooms[room][user_id] == 0:
+                del active_rooms[room][user_id]
+            if len(active_rooms[room]) == 0:
+                del active_rooms[room]
+
             async_to_sync(self.channel_layer.group_send)(
-                self.scope["room"],
+                room,
                 {
                     'type':'active_users',
                 }
@@ -63,8 +69,7 @@ class CompetitionConsumer(JsonWebsocketConsumer):
         self.accept()
     
     def disconnect(self, close_code):
-        if self.scope["user_id"] != None:
-            self.remove_from_active()
+        self.remove_from_active()
 
     def receive_json(self, json_data):
         """
@@ -99,10 +104,10 @@ class CompetitionConsumer(JsonWebsocketConsumer):
                 return
 
             #user has changed profile
+            self.remove_from_active()
             self.scope["user_id"] = user_id
             if self.scope["room"] != None:
                 room = self.scope["room"]
-                self.remove_from_active()
                 if user_id in active_rooms[room]:
                     active_rooms[room][user_id] += 1
                 else:
@@ -167,7 +172,7 @@ class CompetitionConsumer(JsonWebsocketConsumer):
                     room = self.scope["room"]
                     self.send_json({
                         "type":"active_users",
-                        "message": [get_user_data(user_id) for user_id in active_rooms[room].keys()]
+                        "message": [get_user_data(user_id, room) for user_id in active_rooms[room].keys()]
                     })
                 else:
                     #client has not been authenticated
@@ -213,7 +218,16 @@ class CompetitionConsumer(JsonWebsocketConsumer):
         user_id = self.scope["user_id"]
         self.send_json({
             "type":"active_users",
-            "message":[get_user_data(user_id) for user_id in active_rooms[room].keys()]
+            "message":[get_user_data(user_id, room) for user_id in active_rooms[room].keys()]
+        })
+
+    def simple_broadcast(self, event):
+        message_type = event["message_type"]
+        message = event["message"]
+
+        self.send_json({
+            "type":message_type,
+            "message":message
         })
     
     def question_started(self, event):

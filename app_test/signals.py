@@ -83,3 +83,14 @@ def pre_save_test(sender, instance, *args, **kwargs):
                     url='/'
                 )
             for user in User.objects.filter(is_active=True)])
+
+@receiver(post_save, sender=Test, weak=False)
+def post_save_test(sender, instance, *args, **kwargs):
+    if instance.status == "finished":
+        group_name = str(instance.id)
+        message_data = {
+            "type": "simple_broadcast",
+            "message_type":"finished",
+            "message": "finished"
+        }
+        async_to_sync(channel_layer.group_send)(group_name, message_data)
