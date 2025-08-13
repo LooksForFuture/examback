@@ -22,8 +22,13 @@ def get_username(user_id):
         return None
 
 def get_user_data(user_id, test_id):
-    score = UserTestResult.objects.get(user=user_id,
-                                       test=test_id).score
+    score = 0
+    try:
+        score = UserTestResult.objects.get(user=user_id,
+                                           test=test_id).score
+    except:
+        score = 0
+
     try:
         user = User.objects.get(id=user_id)
         return {

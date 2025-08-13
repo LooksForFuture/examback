@@ -46,14 +46,14 @@ def notify_about_question(question):
 @receiver(pre_save, sender=Question, weak=False)
 def pre_save_question(sender, instance, *args, **kwargs):
     if instance.start_datetime:
-        instance.start_datetime += timedelta(seconds=3)
+        instance.start_datetime += timedelta(seconds=13)
 
 @receiver(post_save, sender=Question, weak=False)
 def post_save_question(sender, instance, created, **kwargs):
     if not instance.start_datetime or instance.test.status != "active":
         return
 
-    time_to_start = (instance.start_datetime - datetime.now(instance.start_datetime.tzinfo)).total_seconds()
+    time_to_start = (instance.start_datetime - datetime.now(instance.start_datetime.tzinfo)).total_seconds() - 10
     if time_to_start >= 0:
         threading.Timer(
             time_to_start,
