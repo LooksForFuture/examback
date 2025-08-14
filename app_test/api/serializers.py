@@ -14,14 +14,14 @@ class ManagerTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Test
-        fields = ['id', 'title', 'status', 'question_set']
+        fields = ['id', 'title', 'status', 'image', 'question_set']
         
 
 class TestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Test
-        fields = ['id', 'title', 'status']
+        fields = ['id', 'title', 'status', 'image']
 
 
 class MyTestSerializer(serializers.ModelSerializer):

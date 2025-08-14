@@ -15,9 +15,13 @@ TEST_STATUS_CHOICES = (
     ('finished', 'Finished'),
 )
 
+def test_directoyr_path(instance, filename):
+    return "test_{0}/{1}".format(instance.id, filename)
+
 class Test(models.Model):
     title = models.CharField(max_length=250, null=True)
     status = models.CharField(choices=TEST_STATUS_CHOICES, max_length=8, null=True, default='inactive')
+    image = models.ImageField(upload_to=test_directoyr_path, blank=True)
 
     def __str__(self):
         return self.title
